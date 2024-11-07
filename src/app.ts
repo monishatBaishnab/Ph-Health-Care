@@ -1,6 +1,8 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
-import { UserRoutes } from "./app/modules/user/user.routes";
+import { AppRoutes } from "./app/routes";
+import handleNotFound from "./app/middlewares/handleNotFound";
+import handleGlobalError from "./app/middlewares/handleGlobalError";
 
 const app: Application = express();
 
@@ -11,10 +13,15 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/", (req: Request, res: Response) => {
   res.send({
     success: true,
-    message: "PH Health Care Server...",
+    statusCode: 200,
+    message: "Welcome to PH Health Care Server...",
   });
 });
 
-app.use("/api/v1/users", UserRoutes);
+app.use("/api/v1", AppRoutes);
+
+app.use("*", handleNotFound);
+
+app.use(handleGlobalError);
 
 export default app;
