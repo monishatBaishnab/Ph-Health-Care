@@ -5,6 +5,8 @@ const handleGlobalError = (err: any, req: Request, res: Response, next: NextFunc
   const message: string = err?.name ?? "Something want wrong.";
   const meta: { name: string; message: string }[] = [];
 
+  console.log(err);
+
   res.status(statusCode).send({
     success: false,
     statusCode: statusCode,
