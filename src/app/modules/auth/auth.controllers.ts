@@ -29,7 +29,33 @@ const refreshToken = handleAsync(async (req, res) => {
   });
 });
 
+const forgotPassword = handleAsync(async (req, res) => {
+  await AuthServices.forgotPassword(req.body);
+
+  handleResponse(res, {
+    message: "Check your mail.",
+    statusCode: httpStatus.OK,
+    success: true,
+    // data: result,
+  });
+});
+
+const resetPassword = handleAsync(async (req, res) => {
+  const token = req.headers.authorization || '';
+
+  await AuthServices.resetPassword(token, req.body);
+
+  handleResponse(res, {
+    message: "Password successfully reset.",
+    statusCode: httpStatus.OK,
+    success: true,
+    // data: result,
+  });
+});
+
 export const AuthControllers = {
   loginUser,
-  refreshToken
+  refreshToken,
+  forgotPassword,
+  resetPassword
 };
