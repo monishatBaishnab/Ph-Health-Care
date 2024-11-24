@@ -1,12 +1,18 @@
 import { PrismaClient, UserRole } from "@prisma/client";
 import bcrypt from "bcrypt";
+import { Request } from "express";
+import { uploadHelpers } from "../../utils/uploadHelpers";
+import { TFile } from "../../interface/file";
+import httpError from "../../errors/httpError";
+import httpStatus from "http-status";
+import { localConfig } from "../../../config";
 
 const prisma = new PrismaClient({
   omit: {
     user: {
-      password: true
-    }
-  }
+      password: true,
+    },
+  },
 });
 
 const getAllUsers = async () => {
@@ -14,7 +20,7 @@ const getAllUsers = async () => {
     include: {
       admin: true,
     },
-   
+
     where: {
       NOT: {
         admin: {
@@ -26,8 +32,12 @@ const getAllUsers = async () => {
   return users;
 };
 
-const createAdmin = async (payload: any) => {
-  const hashedPassword = await bcrypt.hash(payload?.password, 11);
+const createAdmin = async (req: Request) => {
+  const image = await uploadHelpers.uploadToCloudinary(req.file as TFile);
+
+  const payload = JSON.parse(req.body?.data);
+  
+  const hashedPassword = await bcrypt.hash(payload?.password, Number(localConfig.bcrypt_salt));
   const userData = {
     email: payload?.admin?.email,
     password: hashedPassword,
@@ -35,6 +45,13 @@ const createAdmin = async (payload: any) => {
   };
 
   const adminData = payload?.admin;
+
+  if (image?.secure_url) {
+    adminData.profilePhoto = image.secure_url;
+  }
+
+  console.log(adminData);
+  console.log(userData);
 
   const result = await prisma.$transaction(async (transactionClient) => {
     const createdUserData = await transactionClient.user.create({

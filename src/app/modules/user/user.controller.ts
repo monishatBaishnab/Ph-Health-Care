@@ -1,5 +1,7 @@
 import { UserServices } from "./user.service";
 import handleAsync from "../../utils/handleAsync";
+import handleResponse from "../../utils/handleResponse";
+import httpStatus from "http-status";
 
 const getAllUsers = handleAsync(async (req, res) => {
   const result = await UserServices.getAllUsers();
@@ -7,8 +9,13 @@ const getAllUsers = handleAsync(async (req, res) => {
 });
 
 const createAdmin = handleAsync(async (req, res) => {
-  const result = await UserServices.createAdmin(req.body);
-  res.send({ success: true, data: result });
+  const result = await UserServices.createAdmin(req);
+  handleResponse(res, {
+    success: true,
+    statusCode: httpStatus.CREATED,
+    message: "Admin Created Successfully",
+    data: result,
+  });
 });
 
 export const UserControllers = {
