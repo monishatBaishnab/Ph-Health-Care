@@ -23,7 +23,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-const uploadToCloudinary = async (file: TFile): Promise<TCloudinaryResponse | undefined> => {
+const uploadToCloudinary = async (
+  file: TFile | undefined
+): Promise<TCloudinaryResponse | undefined> => {
+  if (file === undefined) return;
+
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload(file.path, (error: Error, result: TCloudinaryResponse) => {
       fs.unlinkSync(file.path);
@@ -38,5 +42,5 @@ const uploadToCloudinary = async (file: TFile): Promise<TCloudinaryResponse | un
 
 export const uploadHelpers = {
   upload,
-  uploadToCloudinary
+  uploadToCloudinary,
 };

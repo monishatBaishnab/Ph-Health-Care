@@ -1,42 +1,61 @@
-import { PrismaClient, UserRole } from "@prisma/client";
+import { Doctor, Prisma, PrismaClient, UserRole, UserStatus } from "@prisma/client";
 import bcrypt from "bcrypt";
 import { Request } from "express";
 import { uploadHelpers } from "../../utils/uploadHelpers";
 import { TFile } from "../../interface/file";
-import httpError from "../../errors/httpError";
-import httpStatus from "http-status";
 import { localConfig } from "../../../config";
+import calculatePaginate from "../../utils/calculatePaginate";
 
-const prisma = new PrismaClient({
-  omit: {
-    user: {
-      password: true,
-    },
-  },
-});
+const prisma = new PrismaClient();
 
-const getAllUsers = async () => {
-  const users = await prisma.user.findMany({
-    include: {
-      admin: true,
-    },
+const getAllUsers = async (query: Record<string, unknown>, options: Record<string, unknown>) => {
+  const { searchTerm, ...filters } = query;
+  const { limit, skip, page, sortBy, sortOrder } = calculatePaginate(options);
+  const searchFields: string[] = ["email"];
+  const whoreConditions: Prisma.UserWhereInput[] = [{ status: UserStatus.ACTIVE }];
 
-    where: {
-      NOT: {
-        admin: {
-          isDeleted: true,
+  if (searchTerm) {
+    whoreConditions.push({
+      OR: searchFields.map((field) => ({
+        [field]: {
+          contains: searchTerm as string,
+          mode: "insensitive",
         },
-      },
+      })),
+    });
+  }
+
+  if (filters) {
+    whoreConditions.push({
+      AND: Object.keys(filters).map((key) => ({
+        [key]: {
+          equals: filters[key] as string,
+        },
+      })),
+    });
+  }
+
+  const result = await prisma.user.findMany({
+    where: { AND: whoreConditions },
+    skip: skip,
+    take: limit,
+    orderBy: {
+      [sortBy]: sortOrder,
     },
   });
-  return users;
+
+  const total = await prisma.user.count({
+    where: { AND: whoreConditions },
+  });
+
+  return { data: result, meta: { limit, page, total } };
 };
 
 const createAdmin = async (req: Request) => {
-  const image = await uploadHelpers.uploadToCloudinary(req.file as TFile);
+  const uploadedImage = await uploadHelpers.uploadToCloudinary(req.file as TFile);
 
-  const payload = JSON.parse(req.body?.data);
-  
+  const payload = req.body;
+
   const hashedPassword = await bcrypt.hash(payload?.password, Number(localConfig.bcrypt_salt));
   const userData = {
     email: payload?.admin?.email,
@@ -46,26 +65,54 @@ const createAdmin = async (req: Request) => {
 
   const adminData = payload?.admin;
 
-  if (image?.secure_url) {
-    adminData.profilePhoto = image.secure_url;
+  if (uploadedImage?.secure_url) {
+    adminData.profilePhoto = uploadedImage.secure_url;
   }
-
-  console.log(adminData);
-  console.log(userData);
 
   const result = await prisma.$transaction(async (transactionClient) => {
     const createdUserData = await transactionClient.user.create({
       data: userData,
     });
 
-    const createdAdminData = await transactionClient.admin.create({
+    await transactionClient.admin.create({
       data: adminData,
     });
 
-    return {
-      user: createdUserData,
-      admin: createdAdminData,
-    };
+    return createdUserData;
+  });
+
+  return result;
+};
+
+const createDoctorIntoDb = async (
+  payload: { password: string; doctor: Doctor },
+  file: TFile | undefined
+) => {
+  const uploadedImage = await uploadHelpers.uploadToCloudinary(file as TFile);
+
+  const hashedPassword = await bcrypt.hash(payload?.password, Number(localConfig.bcrypt_salt));
+  const userData = {
+    email: payload?.doctor?.email,
+    password: hashedPassword,
+    role: UserRole.DOCTOR,
+  };
+
+  const doctorData = payload?.doctor;
+
+  if (uploadedImage?.secure_url) {
+    doctorData.profilePhoto = uploadedImage.secure_url;
+  }
+
+  const result = await prisma.$transaction(async (transactionClient) => {
+    const createdUserData = await transactionClient.user.create({
+      data: userData,
+    });
+
+    await transactionClient.doctor.create({
+      data: doctorData,
+    });
+
+    return createdUserData;
   });
 
   return result;
@@ -74,4 +121,5 @@ const createAdmin = async (req: Request) => {
 export const UserServices = {
   getAllUsers,
   createAdmin,
+  createDoctorIntoDb,
 };
